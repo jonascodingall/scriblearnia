@@ -33,31 +33,16 @@ export const load: PageServerLoad = async ({ locals, params }) => {
 };
 
 export const actions = {
-	guessRight: async ({ locals, request }) => {
+	guess: async ({ locals, request }) => {
 		const formData = await request.formData();
 		const guessId = formData.get('guessId')?.toString();
+		const cardId = formData.get('cardId')?.toString();
+		const isCorrect = formData.get('isCorrect') === 'true';
 
 		const data: Partial<GuessesRecord> = {
 			userId: locals.user?.id,
-			cardId: formData.get('cardId')?.toString(),
-			isCorrect: true
-		};
-
-		if (guessId) {
-			await locals.pb.collection('guesses').update(guessId, data);
-		} else {
-			await locals.pb.collection('guesses').create(data);
-		}
-	},
-
-	guessWrong: async ({ locals, request }) => {
-		const formData = await request.formData();
-		const guessId = formData.get('guessId')?.toString();
-
-		const data: Partial<GuessesRecord> = {
-			userId: locals.user?.id,
-			cardId: formData.get('cardId')?.toString(),
-			isCorrect: false
+			cardId: cardId,
+			isCorrect: isCorrect
 		};
 
 		if (guessId) {

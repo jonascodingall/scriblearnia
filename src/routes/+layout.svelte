@@ -8,6 +8,8 @@
 	import { onDestroy, type Snippet } from 'svelte';
 	import { writable } from 'svelte/store';
 	import type { PageData } from './$types';
+	import { cn } from '$lib/utils';
+	import { Button } from '$lib/components/ui/button';
 
 	interface Props {
 		data: PageData;
@@ -33,38 +35,14 @@
 	}
 </script>
 
-<div class="bg-neutral text-neutral-content">
-	<div class="navbar mx-auto max-w-xl">
-		<div class="navbar-start">
-			<a href="/" class="btn btn-ghost text-xl">PB + SK</a>
-		</div>
-		<div class="navbar-end">
-			<ul class="menu menu-horizontal">
-				{#if $user}
-					<li><a href="/">{$user.email}</a></li>
-					<li>
-						<form
-							method="POST"
-							action="/logout"
-							use:enhance={() => {
-								return async ({ result }) => {
-									pb.authStore.clear();
-									await applyAction(result);
-								};
-							}}
-						>
-							<button>Log out</button>
-						</form>
-					</li>
-				{:else}
-					<li><a href="/login">Log in</a></li>
-					<li><a href="/register">Register</a></li>
-				{/if}
-			</ul>
-		</div>
-	</div>
-</div>
-
-<div class="mx-auto max-w-xl px-4 py-8">
-	{@render children?.()}
+<div>
+	<header class="m-5 flex justify-between">
+		<h1>SCIBLEARNIA</h1>
+		<nav class="flex items-center space-x-4 lg:space-x-6">
+			<Button href="/examples/dashboard" class="">Decks</Button>
+		</nav>
+	</header>
+	<main>
+		{@render children?.()}
+	</main>
 </div>

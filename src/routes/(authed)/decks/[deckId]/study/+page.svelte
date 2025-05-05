@@ -1,93 +1,86 @@
+<!-- +page.svelte -->
 <script lang="ts">
-	import { applyAction, enhance } from '$app/forms';
-	import type { CardsRecord, GuessesRecord, GuessesResponse } from '$lib/pocketbase-types';
-	import { onMount } from 'svelte';
+	import FlashcardView from '$lib/components/flashcard-view.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import type { PageProps } from './$types';
+	import type { CardsResponse, GuessesResponse } from '$lib/pocketbase-types';
 
-	let { data }: PageProps = $props();
+	type Expand = {
+		guesses_via_cardId: GuessesResponse[];
+	};
 
+	type CardWithGuesses = CardsResponse<Expand>;
+
+	type CardAction = (action: 'right' | 'wrong' | 'skip') => void;
+
+	const { data }: PageProps = $props();
 	let deck = $state(data.deck);
 	let cards = $state(data.cards);
+	let dueCards = $state<CardWithGuesses[]>([]);
+	let currentCard = $derived(dueCards[0]);
+	let flipped = $state(false);
+
+	const partitionCards = (cards: CardWithGuesses[]) => {
+		const unguessed: CardWithGuesses[] = [];
+		const guessed: CardWithGuesses[] = [];
+
+		cards.forEach((card) => {
+			card.expand.guesses_via_cardId.length > 0 ? guessed.push(card) : unguessed.push(card);
+		});
+
+		return [unguessed, guessed] as const;
+	};
+
+	const sortUnguessed = (cards: CardWithGuesses[]) =>
+		[...cards].sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
+
+	const hasIncorrectGuesses = (card: CardWithGuesses) =>
+		card.expand.guesses_via_cardId.some((guess) => !guess.isCorrect);
+
+	const earliestGuessTime = (card: CardWithGuesses) =>
+		Math.min(...card.expand.guesses_via_cardId.map((g) => new Date(g.created).getTime()));
+
+	const sortGuessed = (cards: CardWithGuesses[]) =>
+		[...cards].sort((a, b) => {
+			const aHasErrors = hasIncorrectGuesses(a);
+			const bHasErrors = hasIncorrectGuesses(b);
+
+			if (aHasErrors !== bHasErrors) return aHasErrors ? -1 : 1;
+			return earliestGuessTime(a) - earliestGuessTime(b);
+		});
+
 	$effect(() => {
 		deck = data.deck;
 		cards = data.cards;
+		const [unguessed, guessed] = partitionCards(data.cards);
+		dueCards = [...sortUnguessed(unguessed), ...sortGuessed(guessed)];
 	});
 
-	const getSortetCards = () => {
-		const noGuess = cards
-			.filter((c) => c.expand.guesses_via_cardId.length === 0)
-			.sort((a, b) => new Date(a.updated).getTime() - new Date(b.updated).getTime());
+	const handleCardAction: CardAction = (action) => {
+		const card = dueCards.shift();
+		if (!card) return;
 
-		const withGuess = cards
-			.filter((c) => c.expand.guesses_via_cardId.length > 0)
-			.sort((a, b) => {
-				// Hilfsfunktion: frühesten Guess-Zeitstempel einer Karte
-				const firstTs = (c: typeof a) =>
-					Math.min(
-						...c.expand.guesses_via_cardId.map((g: GuessesResponse) =>
-							new Date(g.created).getTime()
-						)
-					);
-
-				// Hilfsfunktion: enthält falsche Guesses?
-				const hasFalse = (c: typeof a) =>
-					c.expand.guesses_via_cardId.some((g: GuessesResponse) => !g.isCorrect);
-
-				// 1. Fehler zunächst
-				if (hasFalse(a) && !hasFalse(b)) return -1;
-				if (!hasFalse(a) && hasFalse(b)) return 1;
-
-				// 2. Innerhalb beider Gruppen nach erstem Timestamp sortieren
-				return firstTs(a) - firstTs(b);
-			});
-
-		return [...noGuess, ...withGuess];
-	};
-
-	let dueCards = $state(getSortetCards());
-	let currentCard = $derived(dueCards[0]);
-	let isQuestion = $state(true);
-
-	const nextCard = () => {
-		dueCards.shift();
-		isQuestion = true;
-	};
-
-	const skipCard = () => {
-		let firstCard = dueCards.shift();
-		if (firstCard) {
-			dueCards.push(firstCard);
-		}
-		isQuestion = true;
-	};
-
-	const turnAround = () => {
-		isQuestion = !isQuestion;
+		if (action === 'wrong' || action === 'skip') dueCards.push(card);
+		const safedAnswer = currentCard.answer;
+		currentCard.answer = '';
+		setTimeout(() => (currentCard.answer = safedAnswer), 500);
+		flipped = false;
 	};
 </script>
 
-{#if currentCard}
-	{#if isQuestion}
-		{currentCard.question}
+<div class="mt-40 flex justify-center">
+	{#if currentCard}
+		<FlashcardView
+			card={currentCard}
+			bind:flipped
+			totalCards={data.cards.length}
+			remainingCards={dueCards.length}
+			onAnswer={handleCardAction}
+		/>
 	{:else}
-		{currentCard.answer}
-		<form
-			method="POST"
-			use:enhance={async () => {
-				return async ({ result }) => {
-					nextCard();
-					await applyAction(result);
-				};
-			}}
-		>
-			<input name="cardId" type="hidden" value={currentCard.id} />
-			<input name="guessId" type="hidden" value={currentCard.expand.guesses_via_cardId[0]?.id} />
-			<button formaction="?/guessRight" type="submit">RIGHT</button>
-			<button formaction="?/guessWrong" type="submit">WRONG</button>
-		</form>
+		<div class="flex flex-col items-center gap-4 rounded-lg bg-card p-6 shadow-sm">
+			<h2 class="text-2xl font-semibold text-foreground">All Cards Completed! 🎉</h2>
+			<Button variant="outline" onclick={() => location.reload()}>Restart Session</Button>
+		</div>
 	{/if}
-	<button onclick={turnAround}>TURN AROUND</button>
-	<button onclick={skipCard}>SKIP</button>
-{:else}
-	<p>All Cards Finished</p>
-{/if}
+</div>
