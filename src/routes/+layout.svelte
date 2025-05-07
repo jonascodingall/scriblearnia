@@ -2,7 +2,6 @@
 	import '../app.css';
 
 	import { browser } from '$app/environment';
-	import { applyAction, enhance } from '$app/forms';
 	import { setUserContext } from '$lib/contexts/user';
 	import { pb } from '$lib/pocketbase';
 	import { onDestroy, type Snippet } from 'svelte';
@@ -10,6 +9,9 @@
 	import type { PageData } from './$types';
 	import { cn } from '$lib/utils';
 	import { Button } from '$lib/components/ui/button';
+	import Separator from '$lib/components/ui/separator/separator.svelte';
+	import * as Breadcrumb from '$lib/components/ui/breadcrumb';
+	import { page } from '$app/state';
 
 	interface Props {
 		data: PageData;
@@ -33,15 +35,19 @@
 		}, true);
 		onDestroy(unsubscribe);
 	}
+	// https://github.com/huntabyte/shadcn-svelte/blob/next/sites/docs/src/lib/registry/new-york/block/sidebar-10/components/nav-main.svelte
 </script>
 
 <div>
-	<header class="m-5 flex justify-between">
-		<h1>SCIBLEARNIA</h1>
-		<nav class="flex items-center space-x-4 lg:space-x-6">
-			<Button href="/examples/dashboard" class="">Decks</Button>
-		</nav>
+	<header class="flex justify-between">
+		<div class="flex gap-2">
+			<span>SCIBLEARNIA</span>
+		</div>
+		<div>
+			<h1>SCIBLEARNIA</h1>
+		</div>
 	</header>
+	<Separator />
 	<main>
 		{@render children?.()}
 	</main>
